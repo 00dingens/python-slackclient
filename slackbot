@@ -1,0 +1,78 @@
+#!/usr/bin/python
+
+import sys, os, fcntl
+from slackclient import SlackClient
+
+# https://github.com/slackhq/python-slackclient
+# https://api.slack.com/methods
+# Questions: ask Rafael!
+
+# if doit=False the bot does not modify anything at slack (for development)
+doit=True
+# print debug information
+debug=True
+
+
+# set botname
+botname="RafBot"
+if debug: print "Botname="+botname
+
+
+# this will be called at misuse
+def usage():
+    print '''
+This script reads in content from stdin and posts it in slack.
+
+You need to set the environment variable SLACK_TOKEN.
+Get your personal token at https://api.slack.com/web#authentication'
+
+Usage examples:
+
+   echo "something" | slack general
+   cat file.txt | slack random'''
+    raise SystemExit
+
+
+# get channel name
+if len(sys.argv) < 2:
+    print "Error: No chanel given."
+    usage()
+channelname=sys.argv[1]
+if debug: print "Channel="+channelname
+
+
+# get token
+token = os.environ.get('SLACK_TOKEN')
+if token==None:
+    print "Error: No token set."
+    usage()
+if debug: print "Token="+token
+
+# initialize slack client
+sc = SlackClient(token)
+
+# get channel id
+chls = sc.api_call("channels.list")
+try:
+    cnl = [i['id'] for i in chls['channels'] if i['name'] == channelname][0]
+except IndexError:
+    print "Error: channel "+channelname+" not found."
+    usage()
+if debug: print "Channel="+channelname+" has ID="+cnl
+
+
+# get message to post
+fcntl.fcntl(sys.stdin, fcntl.F_SETFL, os.O_NONBLOCK)
+try:
+    message = sys.stdin.read()
+except IOError:
+    print "Error: Found no input at stdin."
+    usage()
+if debug: print "Message:\n"+message
+
+# post message
+if doit:
+    msg = sc.api_call("chat.postMessage", channel=cnl, text=message, username=botname, icon_emoji=':robot_face:')
+    if debug: print "Message posted successfully."
+else:
+    if debug: print "doit=false."
